@@ -721,6 +721,18 @@ require('lazy').setup({
       default_format_opts = {
         lsp_format = 'fallback', -- Use external formatters if configured below, otherwise use LSP formatting. Set to `false` to disable LSP formatting entirely.
       },
+      -- Per-formatter overrides.
+      formatters = {
+        -- Only run Biome in a project that actually declares it.
+        --
+        -- Without this, conform's builtin still runs Biome when no biome.json is
+        -- found -- it just passes indent flags instead of reading a config. That
+        -- would silently impose Biome's style on every Prettier project, which is
+        -- the same class of bug this whole block exists to fix, pointed the other
+        -- way. With it, a config-less project falls through to the next formatter
+        -- in the chain.
+        ['biome-check'] = { require_cwd = true },
+      },
       -- You can also specify external formatters in here.
       formatters_by_ft = {
         go = { 'goimports', 'gofmt' },
@@ -729,16 +741,31 @@ require('lazy').setup({
         python = { 'isort', 'black' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list.
-        -- oxfmt (the OXC formatter) is preferred when present in a project's node_modules;
-        -- conform falls through to prettier automatically in projects that don't have it.
-        javascript = { 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
-        javascriptreact = { 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
-        typescript = { 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
-        typescriptreact = { 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
+        -- Each of these resolves from the PROJECT's node_modules (conform's
+        -- `from_node_modules`), so the chain is really "whichever formatter this
+        -- repo installed" and an absent one costs nothing.
+        --
+        -- Biome leads because a repo carrying biome.json has made that choice
+        -- explicitly, and without it the fallthrough is actively wrong rather
+        -- than merely absent: prettierd is installed via Mason, so it is on
+        -- nvim's PATH in EVERY project and always wins a chain that reaches it.
+        -- In a Biome repo that means opening a file to read it reformats the
+        -- whole thing on save -- trailing commas, re-wrapped unions -- and the
+        -- churn lands in whatever you commit next, in files you never edited.
+        --
+        -- `biome-check` rather than `biome`: it runs `biome check --write`, which
+        -- is format PLUS safe lint fixes PLUS import sorting -- the same three
+        -- things these repos run in their pre-commit hook. Matching the hook is
+        -- the point. Format-only leaves import order to be discovered at commit
+        -- time, which is the least useful moment to learn about it.
+        javascript = { 'biome-check', 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
+        javascriptreact = { 'biome-check', 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
+        typescript = { 'biome-check', 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
+        typescriptreact = { 'biome-check', 'oxfmt', 'prettierd', 'prettier', stop_after_first = true },
         html = { 'prettierd', 'prettier', stop_after_first = true },
-        css = { 'prettierd', 'prettier', stop_after_first = true },
-        json = { 'prettierd', 'prettier', stop_after_first = true },
-        jsonc = { 'prettierd', 'prettier', stop_after_first = true },
+        css = { 'biome-check', 'prettierd', 'prettier', stop_after_first = true },
+        json = { 'biome-check', 'prettierd', 'prettier', stop_after_first = true },
+        jsonc = { 'biome-check', 'prettierd', 'prettier', stop_after_first = true },
       },
     },
   },
