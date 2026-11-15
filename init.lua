@@ -615,12 +615,26 @@ require('lazy').setup({
             'typescriptreact',
           },
         },
-        --
-        -- Some languages (like typescript) have entire language plugins that can be useful:
-        --    https://github.com/pmizio/typescript-tools.nvim
-        --
-        -- But for many setups, the LSP (`ts_ls`) will work just fine
-        ts_ls = {},
+        -- TypeScript's native (Go) language server. Prefers the project's own
+        -- TypeScript: TS 7+ ships it as `tsc --lsp`, and `@typescript/native-preview`
+        -- as `tsgo`. Falls back to the `tsgo` Mason installs.
+        tsgo = {
+          cmd = function(dispatchers, config)
+            local cmd = { 'tsgo', '--lsp', '--stdio' }
+            local root = (config or {}).root_dir
+            if root then
+              local bin = vim.fs.joinpath(root, 'node_modules/.bin')
+              local ok, pkg = pcall(vim.fn.readfile, vim.fs.joinpath(root, 'node_modules/typescript/package.json'))
+              local version = ok and vim.json.decode(table.concat(pkg, '\n')).version or ''
+              if vim.fn.executable(bin .. '/tsgo') == 1 then
+                cmd[1] = bin .. '/tsgo'
+              elseif (tonumber(version:match '^(%d+)') or 0) >= 7 then
+                cmd[1] = bin .. '/tsc'
+              end
+            end
+            return vim.lsp.rpc.start(cmd, dispatchers)
+          end,
+        },
 
         stylua = {}, -- Used to format Lua code
 
