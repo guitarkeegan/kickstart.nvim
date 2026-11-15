@@ -605,7 +605,17 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         gopls = {},
-        -- pyright = {},
+        pyright = {
+          settings = {
+            python = {
+              analysis = {
+                -- Index the whole workspace so hover/goto works on your own
+                -- modules, not just the file under the cursor.
+                diagnosticMode = 'workspace',
+              },
+            },
+          },
+        },
         rust_analyzer = {},
         emmet_language_server = {
           filetypes = {
